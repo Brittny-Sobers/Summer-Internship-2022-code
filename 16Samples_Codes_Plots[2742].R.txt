@@ -1,0 +1,142 @@
+---
+title: "16 Sample codes and plots"
+author: "Brittny Sobers"
+date: "7/27/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache.lazy= FALSE)
+```
+
+```{r libraries}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(tidyr)
+library(ggplot2)
+library(plyr)
+```
+
+```{r workingdir}
+#Not strictly necessary for you, but needed for others to be able to run as their default working dir is not /nfs/home/bsobers.
+setwd("/nfs/home/bsobers")
+```
+
+```{r load1, cache=TRUE,eval=FALSE}
+so=readRDS("merge16_normalize.RDS")
+
+```
+
+```{r analysis, cache=TRUE,eval=FALSE}
+so<-ScaleData(so)
+
+so<-RunPCA(so)
+
+#Plots 
+ElbowPlot(so, ndims = 50)
+
+so<- FindNeighbors(so, dims = 1:30)
+so<- FindClusters(so)
+so<- RunUMAP(so, dims= 1:30)
+
+```
+
+```{r Plot,eval=FALSE}
+DimPlot(so)
+DimPlot(so, group.by = "orig.ident")
+DimPlot(so, split.by = "orig.ident")
+```
+
+```{r save1, cache = FALSE, eval= FALSE}
+saveRDS(so, "New_merge16code.RDS")
+```
+
+```{r load2, eval=FALSE}
+so<- readRDS("New_merge16code.RDS")
+```
+
+
+```{r genes}
+EP_genes <- c("Ager", "Hopx", "Chi3l1", "Sftpc", "Sftpa1", "Scgb1a1", "Ctsh", "Cldn18", "Cbr2")
+FIB_genes <- c("Col1a1", "Col1a2", "Mgp", "Fn1", "Pdgfra", "Fhl1", "Lox", "Figf", "Limch1", "Mfap4", "Tcf21", "Hsd11b1")
+LEC_genes <- c("Pecam1", "Cav2", "Cav1", "Cdh5", "Cd93", "Lyve1", "Ptprb", "Plvap", "Gpihbp1", "Clec14a", "Tek")
+BEC_genes <- c("Cd34", "Kdr", "Nrp1", "Kitl", "Fibin", "Clec1a", "Tbx3", "Ednrb", "Timp3", "Icam2")
+MPS_genes <- c("Itgb2", "Cst3", "Csf1r", "Sirpa", "Itgax", "Naaa", "Lyz2", "Chi3l3", "Fcgr1")
+GN_genes <- c("Cebpb", "Csf3r", "Lcn2", "Slpi", "S100a9", "Cd24a", "Egr1")
+T_genes <- c("Cd27", "Il7r", "Trbc1", "Trbc2", "Cd3d", "Cd3e", "Cd4", "Cd8a", "Thy1", "Tcf7", "Lef1", "Cd28", "Icos")
+NK_genes <- c("Gzma", "Gzmb", "Klrb1c", "Klrk1","Nkg7", "Ccl5")
+B_genes <- c("Cd19", "Cd22", "Cd79b", "Faim3", "Igkc", "Iglc2", "Iglc3", "Ms4a1", "H2-Ob", "Ly6d", "Cxcr5")
+genes <- c(EP_genes, FIB_genes, LEC_genes, BEC_genes, MPS_genes, GN_genes, T_genes, NK_genes, B_genes)
+```
+
+
+```{r featureplot,eval=FALSE}
+FeaturePlot(so, NK_genes)
+```
+
+```{r heatmap,eval=FALSE}
+DoHeatmap(so, features = genes)
+```
+
+```{r clusterplot,eval=FALSE}
+so<- FindClusters(so, resolution= 0.2)
+P1<- DimPlot(so, group.by ="RNA_snn_res.0.8", label =TRUE) + NoLegend()
+P2<- DimPlot(so, group.by = "RNA_snn_res.0.2", label = TRUE) + NoLegend()
+P1+ P2
+
+```
+
+
+```{r subset,eval=FALSE}
+so2 <- subset(so, downsample = 1000)
+so2 <- ScaleData(so2, intersect(genes, rownames(so2)))
+```
+
+```{r CellTypes, eval=FALSE}
+#EP_genes, FIB_genes, LEC_genes, BEC_genes, MPS_genes, GN_genes, T_genes, NK_genes, B_genes)
+
+Idents(so) <- "RNA_snn_res.0.2"
+so <- RenameIdents(so,
+                   "0" = "B",
+                   "1" = "NK",
+                   "2" = "T",
+                   "3" = "T",
+                   "4" = "T" ,
+                   "5" = "MPS",
+                   "6" = "MPS",
+                   "7" = "GN",
+                   "8" = "T",
+                   "9" = "T",
+                   "10" = "B",
+                   "11" = "MPS",
+                   "12" = "T",
+                   "13" = "NK",
+                   "14" = "Unknown",
+                   "15" = "FIB",
+                   "16" = "LEC",
+                   "17" = "Unknown",
+                   "18" = "MPS",
+                   "19" = "LEC",
+                   "20" = "LEC")
+DimPlot(so, label= TRUE) + NoLegend()
+
+so <- StashIdent(so, "type")
+saveRDS(so, "Merge16_celltypes.RDS")
+```
+
+```{r load3,cache=TRUE}
+so <- readRDS("Merge16_celltypes.RDS")
+```
+
+```{r CountCellTypes}
+# Counting cell types grouping by sample
+ so@meta.data %>% group_by(orig.ident, type) %>% 
+  summarize(count = n()) %>% 
+  group_by(orig.ident) %>% 
+  mutate(freq = count/sum(count)) %>%
+  select(- count) %>% 
+  pivot_wider(names_from = type, values_from = freq, values_fill = 0)
+```
