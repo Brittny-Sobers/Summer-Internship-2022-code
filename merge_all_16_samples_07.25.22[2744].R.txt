@@ -1,0 +1,79 @@
+#Load libraries.
+library(Seurat)
+library(dplyr)
+library(Seurat)
+library(patchwork)
+#Read in from your CellRanger output (for one sample) as we did in the last session.
+#This is basically just a review of how Read10X and CreateSeuratObject work.
+counts=Read10X(data.dir="Sampleallreads_cellranger_count/outs/filtered_feature_bc_matrix")
+counts = CreateSeuratObject(
+counts = counts,
+project="IAV-ML-M-WT1")
+#Next list all files or directories in the current working directory starting with "Sample_IAV".
+dirs <- list.files(pattern = "Sample_IAV", full.names = T)
+dirs
+#Shows the following:
+# [1] "./Sample_IAV-ML-I-KO1"          "./Sample_IAV-ML-I-KO2"         
+# [3] "./Sample_IAV-ML-I-KO3"          "./Sample_IAV-ML-I-KO4"         
+# [5] "./Sample_IAV-ML-I-WT1"          "./Sample_IAV-ML-I-WT2"         
+# [7] "./Sample_IAV-ML-I-WT3"          "./Sample_IAV-ML-I-WT4"         
+# [9] "./Sample_IAV-ML-M-KO1"          "./Sample_IAV-ML-M-KO2"         
+# [11] "./Sample_IAV-ML-M-KO3"          "./Sample_IAV-ML-M-KO4"         
+# [13] "./Sample_IAV-ML-M-WT1"          "./Sample_IAV-ML-M-WT1-allreads"
+# [15] "./Sample_IAV-ML-M-WT2"          "./Sample_IAV-ML-M-WT3"         
+# [17] "./Sample_IAV-ML-M-WT4"         
+# Sample_IAV-ML-M-WT1-allreads is redundant to Sample_IAV-ML-M-WT1 and so should be removed from dirs.
+dirs<- dirs[dirs != "./Sample_IAV-ML-M-WT1-allreads"]
+#Read in from the first item in dirs, including create Seurat object.
+x<- dirs[1]
+path<- paste0(x, "/cellranger/outs/filtered_feature_bc_matrix")
+counts=Read10X(data.dir= path)
+library(stringr)
+#str_replace(x, "./Sample_IAV-ML-", "")
+# [1] "I-KO1"
+counts = CreateSeuratObject(
+counts = counts,
+project=str_replace(x, "./Sample_IAV-ML-", ""))
+#Go back to the count matrix (rather than Seurat object) so we can explore a bit first.
+counts=Read10X(data.dir= path)
+#As we run the Read10X function, get the following error message:
+#Warning: Some features names are NA. Replacing NA names with ID from the opposite column requested
+dim(counts)
+#[1] 32295  5399
+row.names(counts)
+#Gives a crazy long list of gene names that I am not going to copy all of here.
+tail(row.names(counts))
+# [1] NA    "NP"  "HA"  "PA"  "PB1" "PB2"
+#Looks like one of the gene names, which was supposed to be "NA", instead got changed to the NA as in Not Available.
+#Let's fix this by changing that gene to "NA1"
+genes<- row.names(counts)
+which(is.na(genes))
+# [1] 32290
+genes[which(is.na(genes))] <- "NA1"
+tail(genes)
+# [1] "NA1" "NP"  "HA"  "PA"  "PB1" "PB2"
+rownames(counts) <- genes
+tail(rownames(counts))
+# [1] "NA1" "NP"  "HA"  "PA"  "PB1" "PB2"
+#Now should be good to turn these counts into a Seurat object.
+counts = CreateSeuratObject(
+counts = counts,
+project=str_replace(x, "./Sample_IAV-ML-", ""))
+#Run a similar process for every path in dirs.
+#Then, add each Seurat object for each sample to an empty list we will create.
+l <- list()
+for (x in dirs) {
+    path<- paste0(x, "/cellranger/outs/filtered_feature_bc_matrix")
+    counts=Read10X(data.dir= path)
+    genes<- row.names(counts)
+    genes[which(is.na(genes))] <- "NA1"
+    rownames(counts) <- genes
+    counts = CreateSeuratObject(
+        counts = counts,
+        project=str_replace(x, "./Sample_IAV-ML-", ""))
+    l[[x]] <- counts
+}
+#Go from the list of 16 different Seurat objects to one big Seurat object containing counts and metadata for all 16 samples using the "merge" function.
+Mergecounts = merge(l[1],l[2:16])
+#Save progress.
+saveRDS(Mergecounts, "merge16.RDS")
